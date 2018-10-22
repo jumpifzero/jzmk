@@ -44,10 +44,31 @@ byte selectFirstColumn() {
   return 0;
 }
 
-byte selectNextColumn(byte currentColumn) {
+/**
+ * Selects the next column.
+ * Returns the index of the selected column between [0,numColumns[
+ **/
+byte selectNextColumn(byte currentColumn, byte numColumns) {
   digitalWrite(COLSRLATCH, LOW);
   shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 1); // shift out a High.
   digitalWrite(COLSRLATCH, HIGH);
   digitalWrite(COLSRLATCH, LOW);
-  return currentColumn + 1;
+  return (currentColumn + 1) % numColumns;
+}
+
+/**
+ * Outputs the status of the rows via rows array.
+ * numRows can be up to 8.
+ * Returns a bitmap for fast decision on the status of the rows.
+ * Will return 0xFF if nothing is pressed.
+ **/
+void readRows(bool rows[], byte numRows, byte rowsPins[]) {
+  byte result = 0xFF;
+  byte pinValue = 1; // pins will be 1 unless the key is pressed
+  for(byte i=0 ; i<numRows ; i++) {
+    pinValue = digitalRead(rowsPins[i]);
+    result = (result << 1) | (pinValue & 1);
+    rows[i] = pinValue;
+  }
+  return result;
 }
