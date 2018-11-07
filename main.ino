@@ -25,10 +25,11 @@
  **/
 void disableAllColumns() {
   digitalWrite(COLSRLATCH, LOW);
-  for(int i=0 ; i<MAXSR*8 ; i++) {
-    shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 0xFF); // shift out a High
-  }
+  //for(int i=0 ; i<MAXSR*8 ; i++) {
+  shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 0xFF); // shift out a High
+  //}
   digitalWrite(COLSRLATCH, HIGH);
+  delay(10);
   digitalWrite(COLSRLATCH, LOW);
 }
 
@@ -38,7 +39,12 @@ void disableAllColumns() {
  **/
 byte selectFirstColumn() {
   digitalWrite(COLSRLATCH, LOW);
-  shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 0); // shift out a Low
+  digitalWrite(COLSRDATA,0);
+  
+  digitalWrite(COLSRCLOCK,HIGH);
+  delay(10);
+  digitalWrite(COLSRCLOCK,LOW);
+  
   digitalWrite(COLSRLATCH, HIGH);
   digitalWrite(COLSRLATCH, LOW);
   return 0;
@@ -50,9 +56,13 @@ byte selectFirstColumn() {
  **/
 byte selectNextColumn(byte currentColumn, byte numColumns) {
   digitalWrite(COLSRLATCH, LOW);
-  shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 1); // shift out a High.
+  digitalWrite(COLSRDATA, HIGH);
+  digitalWrite(COLSRCLOCK, HIGH);
+  delay(10);
+  digitalWrite(COLSRCLOCK, LOW);
   digitalWrite(COLSRLATCH, HIGH);
   digitalWrite(COLSRLATCH, LOW);
+  digitalWrite(COLSRDATA, LOW);
   return (currentColumn + 1) % numColumns;
 }
 
