@@ -25,7 +25,14 @@
 
 // global constants
 // ----------------
-const byte[] ROWSPINS[7] = {ROW0PIN,ROW1PIN,ROW2PIN,ROW3PIN,ROW4PIN,ROW5PIN,ROW6PIN}; // The pins used to connect to each row.
+const byte ROWSPINS[7] = {ROW0PIN,ROW1PIN,ROW2PIN,ROW3PIN,ROW4PIN,ROW5PIN,ROW6PIN}; // The pins used to connect to each row.
+// The keymap. - this is very incomplete.
+#define KTODO KEY_LEFT_CTRL
+const byte KEYMAP[ROWCOUNT][COLUMNCOUNT] = {
+  {KEY_LEFT_CTRL, KTODO, KEY_LEFT_ALT, ' ', KEY_RIGHT_ALT, KTODO, KTODO, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW},
+  {KEY_LEFT_SHIFT, KTODO, 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, KEY_UP_ARROW}
+};
+
 
 // global variables
 // ----------------
@@ -158,7 +165,7 @@ byte selectNextColumn(byte currentColumn, byte numColumns) {
   delay(10);
   digitalWrite(COLSRCLOCK, LOW);
   digitalWrite(COLSRLATCH, HIGH);
-  digitalWrisudo apt-get upgradete(COLSRLATCH, LOW);
+  digitalWrite(COLSRLATCH, LOW);
   digitalWrite(COLSRDATA, LOW);
   return (currentColumn + 1) % numColumns;
 }
@@ -199,6 +206,10 @@ void keyQueueInsert(byte row, byte column, KeyQueue q) {
 
 }
 
+void sendKeyPress(byte row, byte column) {
+  Keyboard.press(KEYMAP[row][column]);
+}
+
 int main() {
   // this code needs to be rewritten with interrupts
   bool rows[7];
@@ -207,7 +218,6 @@ int main() {
   bool switchOpen = true;
   byte last8Readings = 0xFF;
   bool switchState = false;
-  struct KeyQueue pressesToSend;
 
   init();
   setup();
@@ -221,7 +231,7 @@ int main() {
       last8Readings = matrixReadingsPush(row, selectedColumn, switchOpen);
       switchState = matrixStateGet(row, selectedColumn);
       if (last8Readings==0x0 && !switchState) { // stable press, non press to press.
-
+        sendKeyPress(row, selectedColumn);
         matrixStateSet(row, selectedColumn, true);
 
       }else if (last8Readings==0xFF && switchState) { // stable depress, press to non press.
