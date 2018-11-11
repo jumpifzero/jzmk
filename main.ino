@@ -10,18 +10,21 @@
 #define ROWCOUNT 7 // Number of rows connected to the arduino. The code assumes maximum is 8 ! 
 
 // Rows are directly connected
-#define ROW0PIN 0
-#define ROW1PIN 0
-#define ROW2PIN 0
-#define ROW3PIN 0
-#define ROW4PIN 0
-#define ROW5PIN 0
-#define ROW6PIN 0
+#define ROW0PIN 2
+#define ROW1PIN 3
+#define ROW2PIN 4
+#define ROW3PIN 5
+#define ROW4PIN 6
+#define ROW5PIN 7
+#define ROW6PIN 8
 
 // Columns are connected through shift registers
 #define COLSRDATA 11  // push the bit to this pin
-#define COLSRCLOCK 12 // pulse this pin L-H-L to shift in the data
-#define COLSRLATCH 8  // pulse this pin L-H-L to move the data shifted in to the output.
+#define COLSRCLOCK 9 // pulse this pin L-H-L to shift in the data
+#define COLSRLATCH 10  // pulse this pin L-H-L to move the data shifted in to the output.
+
+#define SCANSTOP 12 // normally off button, normally low, that when goes high stops scan.
+#define SCANSTOPPED 13 // LED, goess high when the scan is stopped.
 
 // global constants
 // ----------------
@@ -188,23 +191,37 @@ byte readRows(bool rows[], byte numRows, byte rowsPins[]) {
 }
 
 void setup() { 
+  pinMode(ROW0PIN, INPUT_PULLUP);
+  pinMode(ROW1PIN, INPUT_PULLUP);
+  pinMode(ROW2PIN, INPUT_PULLUP);
+  pinMode(ROW3PIN, INPUT_PULLUP);
+  pinMode(ROW4PIN, INPUT_PULLUP);
+  pinMode(ROW5PIN, INPUT_PULLUP);
+  pinMode(ROW6PIN, INPUT_PULLUP);
+
+  pinMode(SCANSTOPPED, OUTPUT);
+  digitalWrite(SCANSTOPPED, HIGH);
+  pinMode(SCANSTOP, INPUT);
+  
   pinMode(COLSRDATA, OUTPUT);
   pinMode(COLSRCLOCK, OUTPUT);
   pinMode(COLSRLATCH, OUTPUT);
+  
   // set all outputs in the shift register as high
   disableAllColumns();
+  
+  Keyboard.begin();
 }
 
-typedef struct KeyQueue_s{
-  byte count = 0;
-  byte pressesToSend[8];
-} KeyQueue;
+//typedef struct KeyQueue_s{
+//  byte count = 0;
+//  byte pressesToSend[8];
+//} KeyQueue;
 
-void keyQueueInsert(byte row, byte column, KeyQueue q) {
-  //q.pressesToSend[row] = 
-  q.count = q.count + 1;
-
-}
+//void keyQueueInsert(byte row, byte column, KeyQueue q) {
+//  //q.pressesToSend[row] = 
+//  q.count = q.count + 1;
+//}
 
 void sendKeyPress(byte row, byte column) {
   Keyboard.press(KEYMAP[row][column]);
@@ -218,12 +235,17 @@ int main() {
   bool switchOpen = true;
   byte last8Readings = 0xFF;
   bool switchState = false;
+  bool stopScanningOff = true; // used to break out of scanning routine
 
   init();
   setup();
 
   selectedColumn = selectFirstColumn();
-  for(;;) {
+  while(stopScanningOff) {
+    // read stopScanning button
+    stopScanningOff = digitalRead(SCANSTOP);
+    if(!stopScanningOff){ break; }
+    
     columnsBitmap = readRows(rows, 7, ROWSPINS);
     for(byte row=0; row<ROWCOUNT; row++) {
       // Read switch on row row, column selectedColumn.
@@ -238,6 +260,14 @@ int main() {
         matrixStateSet(row, selectedColumn, true);
       }
     }
+  
+  }
 
+  // We stopped scanning
+  Keyboard.releaseAll();
+  Keyboard.end();
+  digitalWrite(SCANSTOPPED, LOW);
+  while(1){
+    delay(50);
   }
 }
