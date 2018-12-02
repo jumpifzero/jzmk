@@ -45,17 +45,17 @@
 const byte ROWSPINS[7] = {ROW0PIN,ROW1PIN,ROW2PIN,ROW3PIN,ROW4PIN,ROW5PIN,ROW6PIN}; // The pins used to connect to each row.
 // The keymap. GB
 #define NON 0
+
+
 #define KTODO KEY_LEFT_CTRL
 const byte KEYMAP[ROWCOUNT][COLUMNCOUNT] = {
   {NON, KEY_F13, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_F18, KEY_F19, KEY_F20, KEY_F21, KEY_F22, KEY_F23, KEY_F24, NON, NON, NON, NON},
   {KEY_ESC, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, NON, KTODO/*Print*/, KTODO, KTODO}, // TODO
-  {KTODO, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', KTODO, KTODO, KTODO, KTODO},
-  {KTODO, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', KTODO, KTODO, KTODO, KTODO, KTODO, KTODO },
-  {KTODO, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', KTODO, KTODO, KTODO, KTODO, KTODO, KTODO, KTODO},
-  {KEY_LEFT_SHIFT, KTODO, 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, KEY_UP_ARROW, NON},
+  {'`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', KEY_BACKSPACE, KEY_INSERT, KEY_HOME, KEY_PAGE_UP},
+  {KEY_TAB, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', KEY_RETURN, KEY_DELETE, KEY_END, KEY_PAGE_DOWN },
+  {KEY_CAPS_LOCK, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '#', NON, '(', '{', '['},
+  {KEY_LEFT_SHIFT, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, '\'', KEY_UP_ARROW, '\"'},
   {KEY_LEFT_CTRL, KTODO, KEY_LEFT_ALT, NON, NON, NON, ' ', NON, NON, NON, KEY_RIGHT_ALT, NON, NON, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW}
-  
-  
 };
 #ifdef _smallKeymap
 const byte KEYMAP[ROWCOUNT][2] = { 
@@ -120,13 +120,15 @@ void matrixStateSet(byte row, byte column, bool state) {
   if ( state ) { // if setting that bit as 1, we need to
     // or with as mask full of zeros except in that position.
     bitmask = 0x1 << row;
-    columnState = columnState & bitmask;
+    columnState = columnState | bitmask;
   } else {
     // when setting that bit as 0, and with 1's everywhere
     // except that position.
     bitmask = 0xFE; // 11111110
-    bitmask = bitmask << row;
-    columnState |= bitmask;
+    for(int i=0; i<row; i++){
+      bitmask = ((bitmask << 1) | 0x1); // inject 1 on the right  
+    }
+    columnState &= bitmask;
   }
   matrixState[column] = columnState;
 }
@@ -168,7 +170,7 @@ void disableAllColumns() {
     shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 0xFF); // shift out a High
   }
   digitalWrite(COLSRLATCH, HIGH);
-  delay(SRMINDELAY);
+  //delay(SRMINDELAY);
   digitalWrite(COLSRLATCH, LOW);
 }
 
@@ -180,9 +182,9 @@ byte selectFirstColumn() {
   digitalWrite(COLSRLATCH, LOW);
   digitalWrite(COLSRCLOCK, LOW);
   digitalWrite(COLSRDATA,0);
-  delay(SRMINDELAY);
+  //delay(SRMINDELAY);
   digitalWrite(COLSRCLOCK,HIGH);
-  delay(SRMINDELAY);
+  //delay(SRMINDELAY);
   digitalWrite(COLSRCLOCK,LOW);
 
   digitalWrite(COLSRLATCH, HIGH);
@@ -202,7 +204,7 @@ byte selectNextColumn(byte currentColumn, byte numColumns) {
     digitalWrite(COLSRLATCH, LOW);
     digitalWrite(COLSRDATA, HIGH);
     digitalWrite(COLSRCLOCK, HIGH);
-    delay(SRMINDELAY);
+    //delay(SRMINDELAY);
     digitalWrite(COLSRCLOCK, LOW);
     digitalWrite(COLSRDATA, LOW);
     digitalWrite(COLSRLATCH, HIGH);
@@ -274,6 +276,68 @@ void sendKeyRelease(byte row, byte column) {
   Keyboard.release(KEYMAP[row][column]);
 }
 
+typedef struct action_s { 
+  byte action;
+  byte key;  
+} action;
+
+typedef struct macro_s { 
+  byte len;
+  action* actions;  
+} macro;
+
+// Fixed macro definitions
+action PARENS_ACTIONS[12] = {
+  {ACTION_PRESS, '('}, 
+  {ACTION_RELEASE, '('}, 
+  {ACTION_PRESS, ')'}, 
+  {ACTION_RELEASE, ')'}, 
+  {ACTION_PRESS, KEY_LEFT_ARROW}, 
+  {ACTION_RELEASE, KEY_LEFT_ARROW}
+};
+  }
+macro PARENS = {6, &PARENS_ACTIONS}
+
+macro macros[COLUMNCOUNT];
+
+void simulateTyping(byte row, byte column){
+  Keyboard.press('(');
+  Keyboard.release('(');
+  Keyboard.press(')');
+  Keyboard.release(')');
+  Keyboard.press(KEY_LEFT_ARROW);
+  Keyboard.release(KEY_LEFT_ARROW);
+    
+}
+
+// Action keymap. For every key, maps a function which determines what happens.
+const void (*ACTIONS[ROWCOUNT][COLUMNCOUNT]) (byte row, byte column) = {
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, simulateTyping, simulateTyping, simulateTyping},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, simulateTyping, sendKeyPress, simulateTyping},
+  {sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress, sendKeyPress}
+};
+
+void onPressDispatchAction(byte row, byte column){
+    return (ACTIONS[row][column])(row, column);
+}
+
+#define MAX_MULTI_KEY 3
+
+typedef struct MultiKey_s {
+   byte len;
+   byte keys[MAX_MULTI_KEY];
+} MultiKey;
+
+
+
+void pressReleaseMultiple(byte row, byte column){
+    
+}
+
 void loop() {
   // this code needs to be rewritten with interrupts
   bool rows[7];
@@ -309,7 +373,7 @@ void loop() {
       //Serial.println(row, 10);
       // Read switch on row row, column selectedColumn.
       switchOpen = (bool)digitalRead(ROWSPINS[row]);
-      if(!switchOpen && row==1 && selectedColumn==0){ 
+      if(!switchOpen && row==0 && selectedColumn==1){ 
         Serial.println("stopping scan");
         stopScanningOff = false;
         break;
@@ -321,7 +385,7 @@ void loop() {
       last8Readings = matrixReadingsPush(row, selectedColumn, switchOpen);
       switchState = matrixStateGet(row, selectedColumn);
       if (last8Readings==0x0 && !switchState) { // stable press, non press to press.
-        sendKeyPress(row, selectedColumn);
+        onPressDispatchAction(row, selectedColumn);
         matrixStateSet(row, selectedColumn, true);
 
       }else if (last8Readings==0xFF && switchState) { // stable depress, press to non press.
