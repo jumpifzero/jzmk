@@ -1,5 +1,13 @@
 /*
-
+ 
+ Firmware for a keyboard based on an ATMega32u4.
+ TKL GB Layout with an extra row above the Fs 
+ for macro recording and extra keys.
+ 
+ Copyright: Tiago Almeida (jumpifzero@gmail.com)
+ All rights reserved.
+ 2019
+ 
 */
 
 #include <Keyboard.h>
@@ -34,16 +42,16 @@
 #define ROW6PIN 8
 
 // Columns are connected through shift registers
-#define COLSRDATA 11  // push the bit to this pin
-#define COLSRCLOCK 9 // pulse this pin L-H-L to shift in the data
-#define COLSRLATCH 10  // pulse this pin L-H-L to move the data shifted in to the output.
+#define COLSRDATA 14  // push the bit to this pin
+#define COLSRCLOCK 10 // pulse this pin L-H-L to shift in the data
+#define COLSRLATCH 16  // pulse this pin L-H-L to move the data shifted in to the output.
 
 #define SCANSTOP 12 // normally off button, normally low, that when goes high stops scan.
 #define SCANSTOPPED 13 // LED, goess high when the scan is stopped.
 
 #define ACTION_PRESS 1
 #define ACTION_RELEASE 2
-#define ACTIONSMEMSIZE 256 // Total memory for macros in pairs action+key.
+#define ACTIONSMEMSIZE 500 // Total memory for macros in pairs action+key.
 
 typedef struct action_s { 
   byte action;
@@ -55,15 +63,6 @@ typedef struct macro_s {
   action* actions;  
 } macro;
 
-
-void readFromEEPROM1(byte* dest, int bufSize) { 
-  byte value;
-  int actualLen = min(bufSize, EEPROM.length());
-  for(int i=0 ; i<actualLen ; i++) { 
-    value = EEPROM.read(i);
-    dest[i] = value;
-  } 
-}
 
 
 // global constants
@@ -95,6 +94,7 @@ const byte KEYMAP[ROWCOUNT][2] = {
 };
 #endif 
 
+
 // =============================================
 // global variables
 // =============================================
@@ -104,10 +104,12 @@ const byte KEYMAP[ROWCOUNT][2] = {
 // Check functions matrixStateInit, matrixStateGet, matrixStateSet to manipulate this.
 byte matrixState[COLUMNCOUNT];
 
+
 // Stores a byte per switch that is used to collect up to the last 8
 // readings of the switch, to allow for a simple debounce mechanism.
 // See matrixReadingsInit
 byte matrixReadings[ROWCOUNT][COLUMNCOUNT];
+
 
 // Global keyboard state
 struct kbState_s { 
@@ -121,6 +123,7 @@ struct kbState_s {
   int actionsLen;
 } kbState;
 
+
 /**
  * Sets state of all switches in the matrix as not-pressed (LOW)
  **/
@@ -130,33 +133,63 @@ void matrixStateInit() {
   }
 }
 
+
+// Dumps all macros into EEPROM.
+void writeMacrosToEEPROM() { 
+  // All info we need to dump is on kbState. 
+  // First we need to dump macros[]
+  // then actions[].
+  int macroArraySize = sizeof(macro) * 12;
+  int actionsArraySize = sizeof(action) * ACTIONSMEMSIZE;
+  writeToEEPROM((byte*)kbState.macros, macroArraySize+actionsArraySize);
+}
+
+
+void readMacrosFromEEPROM() { 
+  int macroArraySize = sizeof(macro) * 12;
+  int actionsArraySize = sizeof(action) * ACTIONSMEMSIZE;
+  readFromEEPROM((byte*)kbState.macros, macroArraySize+actionsArraySize);
+}
+
+
 void kbStateInit() { 
   kbState.recording = false;  
   kbState.currentRecordingLen = 0;
   kbState.currentRecordingBufSize = 256;
-  kbState.actionsLen = 0;
-  for(int i=0 ; i<12 ; i++){
-    kbState.macros[i].len = 0;  
+  readMacrosFromEEPROM();
+  // by default the eeprom is all 0xFF. We look at the len of 
+  // macros[0] to see if what was loaded makes sense or we need to 
+  // initialize to a sensible initial state.
+  if (kbState.macros[0].len == 255) {
+    kbState.actionsLen = 0;
+    for(int i=0 ; i<12 ; i++){
+      kbState.macros[i].len = 0;  
+    }
+    writeMacrosToEEPROM();
   }
 }
 
+
 void currentRecordingAddKeyPress(byte key) {
-  Serial.print("reclen="); Serial.print(kbState.currentRecordingLen); Serial.println();
+  // Serial.print("reclen="); Serial.print(kbState.currentRecordingLen); Serial.println();
   kbState.currentRecording[kbState.currentRecordingLen].action = ACTION_PRESS;
   kbState.currentRecording[kbState.currentRecordingLen].key = key;
   kbState.currentRecordingLen = kbState.currentRecordingLen + 1;
 }
 
+
 void currentRecordingAddKeyRelease(byte key) {
-  Serial.print("reclen="); Serial.print(kbState.currentRecordingLen); Serial.println();
+  // Serial.print("reclen="); Serial.print(kbState.currentRecordingLen); Serial.println();
   kbState.currentRecording[kbState.currentRecordingLen].action = ACTION_RELEASE;
   kbState.currentRecording[kbState.currentRecordingLen].key = key;
   kbState.currentRecordingLen = kbState.currentRecordingLen + 1;
 }
 
+
 void currentRecordingClear(){
   kbState.currentRecordingLen = 0;
 }
+
 
 /**
  * Returns the state of the switch at row, column, as a bool.
@@ -177,6 +210,7 @@ bool matrixStateGet(byte row, byte column) {
   byte bitmask = (((byte)0x1) << row);
   return (bool)(columnState & bitmask);
 }
+
 
 /**
  * Records state of switch in row row and column column as a bit.
@@ -200,6 +234,7 @@ void matrixStateSet(byte row, byte column, bool state) {
   matrixState[column] = columnState;
 }
 
+
 void matrixReadingsInit() {
   for(byte row=0 ; row<ROWCOUNT ; row++) {
     for(byte column=0 ; column<COLUMNCOUNT ; column++) {
@@ -208,9 +243,11 @@ void matrixReadingsInit() {
   }
 }
 
+
 byte matrixReadingsGet(byte row, byte column) {
   return matrixReadings[row][column];
 }
+
 
 /**
  * Pushes a new bit as a reading for the switch in row/column
@@ -228,6 +265,7 @@ byte matrixReadingsPush(byte row, byte column, bool state) {
   return readings;
 }
 
+
 /**
  * Sets all columns connected to the shift registers to be High
  **/
@@ -237,9 +275,9 @@ void disableAllColumns() {
     shiftOut(COLSRDATA, COLSRCLOCK, LSBFIRST, 0xFF); // shift out a High
   }
   digitalWrite(COLSRLATCH, HIGH);
-  //delay(SRMINDELAY);
   digitalWrite(COLSRLATCH, LOW);
 }
+
 
 /**
  * Selects the first column by setting it low.
@@ -381,16 +419,37 @@ void executeActions(action* acts, int len) {
 }
 
 
+//void macrosMakeSpaceForRecording(byte macroIndex, byte actionsRecorded) { 
+//  byte totalMacros = 12;
+//  int location = kbState.actionsLen;
+//  action* nextMacroActionsPtr = NULL;
+//  
+//  if ( macroIndex<11 ) {
+//    nextMacroActionsPtr = kbState.macros[macroIndex+1].actions;
+//    thisMacroActionsEndPtr = location + actionsRecorded
+//       
+//  } 
+//  // else { 
+//    // we are writing the last macro. Nothing to move.  
+//  // }
+//  
+//}
+
+
+// Called when one of the Macro keys is pressed.
 void macroKeyPress(byte row, byte column){
   if ( kbState.recording ) { // record a new macro
-    Serial.println("M K press while recording");
     // The keys that were captured are in currentRecording. 
     // The size of the recording is in currentRecordingLen.
     kbState.macros[column-1].len = kbState.currentRecordingLen;
-    Serial.print("MLEN");Serial.print(kbState.currentRecordingLen); Serial.println();
-    // copy the current recording to the kbState.actions
+    // All the actions of all macros need to be compacted on
+    // a single array. So if we are trying to overwrite the 
+    // Macro N we need to make sure there's no space after
+    // the actions of N. This means we may need to shift left
+    // all macros above N or shift them right.
+    // This is dealt on function macrosMakeSpaceForRecording
+    // macrosMakeSpaceForRecording(column-1, );
     int startOfAction = kbState.actionsLen;
-    Serial.print("SOA");Serial.print(startOfAction); Serial.println();
     for(int i=0 ; i<kbState.currentRecordingLen; i++){
       kbState.actions[kbState.actionsLen].action = kbState.currentRecording[i].action;
       kbState.actions[kbState.actionsLen].key = kbState.currentRecording[i].key;  
@@ -399,8 +458,9 @@ void macroKeyPress(byte row, byte column){
     kbState.macros[column-1].actions = &(kbState.actions[startOfAction]);
     currentRecordingClear();
     kbState.recording = false;
+    // store all macros into eeprom
+    
   } else { // execute the macro
-    Serial.println("M K press");
     executeActions(kbState.macros[column-1].actions, kbState.macros[column-1].len);    
   }
 }
