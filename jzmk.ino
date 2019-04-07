@@ -68,17 +68,15 @@ typedef struct macro_s {
 // global constants
 // ----------------
 const byte ROWSPINS[7] = {ROW0PIN,ROW1PIN,ROW2PIN,ROW3PIN,ROW4PIN,ROW5PIN,ROW6PIN}; // The pins used to connect to each row.
-// The keymap. GB
 #define NON 0
-
 
 #define KTODO KEY_LEFT_CTRL
 // Note on the below keycodes:
-// The keyboard.press method accepts an ascii code, not a keycode.
+// The keyboard.press method accepts an ascii code, not an HID keycode.
 // This makes it easier to send specific letters but complicated to send special keys (like the windows key).
 // According to this article http://joshfire-tech.tumblr.com/post/65032568887/arduino-keyboard-emulation-send-real-key-codes
-// (which is copied below in case the link dies), there is a trick which is to add 136 to the keycode. This will work but 
-//// is limits the keycodes that can be sent to the ones below 119.
+// (which is copied below in case the link dies), there is a trick which is to add 136 to the code. This will work but 
+// limits the keycodes that can be sent to the ones below 119.
 //size_t Keyboard_::press(uint8_t k) 
 //{
 //        uint8_t i;
@@ -108,17 +106,6 @@ const byte KEYMAP[ROWCOUNT][COLUMNCOUNT] = {
   {KEY_LEFT_SHIFT, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, '\'', KEY_UP_ARROW, '\"'},
   {KEY_LEFT_CTRL, 0x83, KEY_LEFT_ALT, NON, NON, NON, ' ', NON, NON, NON, KEY_RIGHT_ALT, 0x87, 0xED, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW}
 };
-#ifdef _smallKeymap
-const byte KEYMAP[ROWCOUNT][2] = { 
-  {'a', 'b'},  
-  {'c', 'd'},
-  {'f', 'e'},
-  {'g', 'h'},
-  {'g', 'h'},
-  {'g', 'h'},
-  {'g', 'h'}
-};
-#endif 
 
 
 // =============================================
@@ -182,7 +169,7 @@ void kbStateInit() {
   kbState.recording = false;  
   kbState.currentRecordingLen = 0;
   kbState.currentRecordingBufSize = 256;
-  readMacrosFromEEPROM();
+  //readMacrosFromEEPROM();
   // by default the eeprom is all 0xFF. We look at the len of 
   // macros[0] to see if what was loaded makes sense or we need to 
   // initialize to a sensible initial state.
@@ -191,7 +178,7 @@ void kbStateInit() {
     for(int i=0 ; i<12 ; i++){
       kbState.macros[i].len = 0;  
     }
-    writeMacrosToEEPROM();
+    //writeMacrosToEEPROM();
   }
 }
 
@@ -445,21 +432,75 @@ void executeActions(action* acts, int len) {
 }
 
 
-//void macrosMakeSpaceForRecording(byte macroIndex, byte actionsRecorded) { 
-//  byte totalMacros = 12;
-//  int location = kbState.actionsLen;
-//  action* nextMacroActionsPtr = NULL;
-//  
-//  if ( macroIndex<11 ) {
-//    nextMacroActionsPtr = kbState.macros[macroIndex+1].actions;
-//    thisMacroActionsEndPtr = location + actionsRecorded
-//       
-//  } 
-//  // else { 
-//    // we are writing the last macro. Nothing to move.  
-//  // }
-//  
-//}
+/**
+ * Shifts an actions array inplace to the right, right to left.
+ */
+void shiftActionsRight(action* actions, int actionsLen, int positions) {
+  for(int i=actionsLen ; i>0 ; i--) {
+    actions[i+positions] = actions[i];
+  }    
+}
+
+/**
+ * Shifts an actions array inpace to the left. Left to right.
+ * positions is negative
+ */
+void shiftActionsLeft(action* actions, int actionsLen, int positions) { 
+  for(int i=0 ; i<actionsLen ; i++) {
+    actions[i+positions] = actions[i];
+  }
+}
+
+void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) { 
+  // first determine the lastMacro with a non 0 length.
+  byte lastMacroToShift;
+  for(byte i=firstMacroToShift ; i<12 ; i++) { 
+    if(macros[i].len > 0){
+      lastMacroToShift = i;  
+    }
+  }
+  // if we are shifting right we need to start from the the right, else we start from the left.
+  if(positions>0) {
+    // shift the macros to the right
+    for(int i=lastMacroToShift ; i>firstMacroToShift ; i--) { 
+        shiftActionsRight(macros[i].actions, macros[i].len, positions);
+        macros[i].actions = macros[i].actions + positions;
+    }  
+  } else { 
+     for(int i=firstMacroToShift ; i<lastMacroToShift ; i++) { 
+        shiftActionsLeft(macros[i].actions, macros[i].len, positions);
+        macros[i].actions = macros[i].actions + positions;
+    }
+  } 
+}
+
+void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) { 
+  byte totalMacros = 12;
+  int location = kbState.actionsLen;
+  int firstEmptyIndex;
+  action* nextMacroActionsPtr = NULL;
+
+  // add the size of all the macros to the right of macroIndex
+  int totalSizeToTheLeft = 0;
+  int totalSizeToTheRight = 0;
+  for(int i=macroIndex ; i<totalMacros ; i++) { 
+    totalSizeToTheRight += kbState.macros[i].len;
+  }
+  // add the size of all the macros to the left of macroIndex
+  for(int i=0 ; i<macroIndex ; i++) { 
+    totalSizeToTheLeft += kbState.macros[i].len;
+  }
+  int startMacroIndex = totalSizeToTheLeft + 1;
+  int endMacroIndex = startMacroIndex + numberActionsRecorded;
+  // the macros to the right may need to be shifted to the right
+  // if this one is larger than it was before
+  // or to the left if this one is smaller than was before.
+  int positionsToShiftRight = ( numberActionsRecorded - kbState.macros[macroIndex].len);
+  // positive > shift macros to the right, negative -> shift them to the left.
+
+  // work in progress
+   
+}
 
 
 // Called when one of the Macro keys is pressed.
