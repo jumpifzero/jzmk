@@ -73,14 +73,40 @@ const byte ROWSPINS[7] = {ROW0PIN,ROW1PIN,ROW2PIN,ROW3PIN,ROW4PIN,ROW5PIN,ROW6PI
 
 
 #define KTODO KEY_LEFT_CTRL
+// Note on the below keycodes:
+// The keyboard.press method accepts an ascii code, not a keycode.
+// This makes it easier to send specific letters but complicated to send special keys (like the windows key).
+// According to this article http://joshfire-tech.tumblr.com/post/65032568887/arduino-keyboard-emulation-send-real-key-codes
+// (which is copied below in case the link dies), there is a trick which is to add 136 to the keycode. This will work but 
+//// is limits the keycodes that can be sent to the ones below 119.
+//size_t Keyboard_::press(uint8_t k) 
+//{
+//        uint8_t i;
+//        if (k >= 136) {  // it's a non-printing key (not a modifier)
+//                k = k - 136;
+//        } else if (k >= 128) {  // it's a modifier key
+//                _keyReport.modifiers |= (1<<(k-128));
+//                k = 0;
+//        } else {  // it's a printing key
+//                k = pgm_read_byte(_asciimap + k);
+//                // ... more code ...
+//        }
+//        // ... more code ...
+//        // k is the key code sent to the computer
+//        return 1;
+//}
+//If k is < 128, it’s an ascii character, if it’s between 128 and 136 it’s a modifier (shift, alt, ctrl…) and if it’s greater than 136, it’s an unknown key.
+//If you call Keyboard.press(238), k is greater than 136 and is transformed into 238 - 136 = 102 = 0x66 = “power” key! That’s it! To send a key code instead of an ascii character, just add 136 to it.
+//Since k is a uint8_t, the max value is 255 so you are limited to key codes < 119.
+
 const byte KEYMAP[ROWCOUNT][COLUMNCOUNT] = {
   {NON, KEY_F13, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_F18, KEY_F19, KEY_F20, KEY_F21, KEY_F22, KEY_F23, KEY_F24, NON, NON, NON, NON},
-  {KEY_ESC, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, NON, KTODO/*Print*/, KTODO, KTODO}, // TODO
+  {KEY_ESC, KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12, NON, 0xCE/*Print 0x46+0x88*/, 0xCF, 0xD0}, /*these codes have 0x88 added*/
   {'`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', KEY_BACKSPACE, KEY_INSERT, KEY_HOME, KEY_PAGE_UP},
   {KEY_TAB, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', KEY_RETURN, KEY_DELETE, KEY_END, KEY_PAGE_DOWN },
-  {KEY_CAPS_LOCK, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '#', NON, '(', '{', '['},
+  {KEY_CAPS_LOCK, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', 0xBA, NON, '(', '{', '['},
   {KEY_LEFT_SHIFT, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, '\'', KEY_UP_ARROW, '\"'},
-  {KEY_LEFT_CTRL, KTODO, KEY_LEFT_ALT, NON, NON, NON, ' ', NON, NON, NON, KEY_RIGHT_ALT, NON, NON, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW}
+  {KEY_LEFT_CTRL, 0x83, KEY_LEFT_ALT, NON, NON, NON, ' ', NON, NON, NON, KEY_RIGHT_ALT, 0x87, 0xED, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW}
 };
 #ifdef _smallKeymap
 const byte KEYMAP[ROWCOUNT][2] = { 
