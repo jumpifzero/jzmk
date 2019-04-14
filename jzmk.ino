@@ -52,6 +52,7 @@
 #define ACTION_PRESS 1
 #define ACTION_RELEASE 2
 #define ACTIONSMEMSIZE 500 // Total memory for macros in pairs action+key.
+#define MACROSIZE 12       // Total number of dynamic macros
 
 typedef struct action_s { 
   byte action;
@@ -130,7 +131,7 @@ struct kbState_s {
   action currentRecording[200];
   int currentRecordingLen;
   int currentRecordingBufSize;
-  macro macros[12];     // The macros mapped by each macro key m1,m2,etc.
+  macro macros[MACROSIZE];     // The macros mapped by each macro key m1,m2,etc.
   action actions[ACTIONSMEMSIZE];  // The actions comprising each macro, pointed by macro
   // the actions array is _always_ kept compacted from index 0 up to actionsLen.
   int actionsLen;
@@ -152,7 +153,7 @@ void writeMacrosToEEPROM() {
   // All info we need to dump is on kbState. 
   // First we need to dump macros[]
   // then actions[].
-  int macroArraySize = sizeof(macro) * 12;
+  int macroArraySize = sizeof(macro) * MACROSIZE;
   int actionsArraySize = sizeof(action) * ACTIONSMEMSIZE;
   writeToEEPROM((byte*)kbState.macros, macroArraySize+actionsArraySize);
 }
@@ -436,10 +437,11 @@ void executeActions(action* acts, int len) {
  * Shifts an actions array inplace to the right, right to left.
  */
 void shiftActionsRight(action* actions, int actionsLen, int positions) {
-  for(int i=actionsLen ; i>0 ; i--) {
+  for(int i=actionsLen-1 ; i>=0 ; i--) {
     actions[i+positions] = actions[i];
   }    
 }
+
 
 /**
  * Shifts an actions array inpace to the left. Left to right.
@@ -451,10 +453,11 @@ void shiftActionsLeft(action* actions, int actionsLen, int positions) {
   }
 }
 
+
 void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) { 
   // first determine the lastMacro with a non 0 length.
   byte lastMacroToShift;
-  for(byte i=firstMacroToShift ; i<12 ; i++) { 
+  for(byte i=firstMacroToShift ; i<MACROSIZE ; i++) { 
     if(macros[i].len > 0){
       lastMacroToShift = i;  
     }
@@ -474,32 +477,41 @@ void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) {
   } 
 }
 
+
+int addLengthOfMacroActions(macro* macros, byte startIndex, byte endIndex) {
+  int result = 0;
+  for(int i=startIndex ; i<endIndex ; i++) {
+    result += macros[i].len;
+  }
+  return result;
+}
+
+
 void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) { 
-  byte totalMacros = 12;
+  byte totalMacros = MACROSIZE;
   int location = kbState.actionsLen;
   int firstEmptyIndex;
   action* nextMacroActionsPtr = NULL;
 
+  if ( macroIndex == (totalMacros - 1)) {
+    // we're saving the last macro, there's nothing to do.
+    return;
+  }
+
   // add the size of all the macros to the right of macroIndex
   int totalSizeToTheLeft = 0;
   int totalSizeToTheRight = 0;
-  for(int i=macroIndex ; i<totalMacros ; i++) { 
-    totalSizeToTheRight += kbState.macros[i].len;
-  }
+  totalSizeToTheRight = addLengthOfMacroActions(kbState.macros, macroIndex+1, totalMacros);
   // add the size of all the macros to the left of macroIndex
-  for(int i=0 ; i<macroIndex ; i++) { 
-    totalSizeToTheLeft += kbState.macros[i].len;
-  }
+  totalSizeToTheLeft = addLengthOfMacroActions(kbState.macros, 0, macroIndex);
   int startMacroIndex = totalSizeToTheLeft + 1;
   int endMacroIndex = startMacroIndex + numberActionsRecorded;
   // the macros to the right may need to be shifted to the right
   // if this one is larger than it was before
   // or to the left if this one is smaller than was before.
   int positionsToShiftRight = ( numberActionsRecorded - kbState.macros[macroIndex].len);
-  // positive > shift macros to the right, negative -> shift them to the left.
-
-  // work in progress
-   
+  // positive -> shift macros to the right, negative -> shift them to the left.
+  shiftMacroActions(kbState.macros, macroIndex+1, positionsToShiftRight);
 }
 
 
@@ -515,7 +527,9 @@ void macroKeyPress(byte row, byte column){
     // the actions of N. This means we may need to shift left
     // all macros above N or shift them right.
     // This is dealt on function macrosMakeSpaceForRecording
-    // macrosMakeSpaceForRecording(column-1, );
+    macrosMakeSpaceForRecording(column-1, kbState.currentRecordingLen);
+    // Add the length of all the macro actions to the left of this one.
+
     int startOfAction = kbState.actionsLen;
     for(int i=0 ; i<kbState.currentRecordingLen; i++){
       kbState.actions[kbState.actionsLen].action = kbState.currentRecording[i].action;
@@ -531,6 +545,7 @@ void macroKeyPress(byte row, byte column){
     executeActions(kbState.macros[column-1].actions, kbState.macros[column-1].len);    
   }
 }
+
 
 // Fixed macro definitions
 action TYPE_PARENS[6] = {
