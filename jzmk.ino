@@ -52,7 +52,7 @@
 #define ACTION_PRESS 1
 #define ACTION_RELEASE 2
 #define ACTIONSMEMSIZE 500 // Total memory for macros in pairs action+key.
-#define MACROSIZE 12       // Total number of dynamic macros
+#define MACROSIZE 11       // Total number of dynamic macros
 
 typedef struct action_s { 
   byte action;
@@ -104,7 +104,7 @@ const byte KEYMAP[ROWCOUNT][COLUMNCOUNT] = {
   {'`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', KEY_BACKSPACE, KEY_INSERT, KEY_HOME, KEY_PAGE_UP},
   {KEY_TAB, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', KEY_RETURN, KEY_DELETE, KEY_END, KEY_PAGE_DOWN },
   {KEY_CAPS_LOCK, 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', 0xBA, NON, '(', '{', '['},
-  {KEY_LEFT_SHIFT, '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, '\'', KEY_UP_ARROW, '\"'},
+  {KEY_LEFT_SHIFT, 0xEC/*0x64+0x88*/, 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', KEY_RIGHT_SHIFT, NON, '\'', KEY_UP_ARROW, 0xBC /*+0x88*/},
   {KEY_LEFT_CTRL, 0x83, KEY_LEFT_ALT, NON, NON, NON, ' ', NON, NON, NON, KEY_RIGHT_ALT, 0x87, 0xED, KEY_RIGHT_CTRL, KEY_LEFT_ARROW, KEY_DOWN_ARROW, KEY_RIGHT_ARROW}
 };
 
@@ -380,23 +380,23 @@ void setup() {
 // EXECUTORS. These functions carry out use functions.
 void sendKeyPress(byte row, byte column) {
   Keyboard.press(KEYMAP[row][column]);
-  return;
-  //char buf[4];
-  //sprintf (buf, "%c", KEYMAP[row][column]);
-  //Serial.println(buf);
 }
+
 
 void sendKeyRelease(byte row, byte column) {
   Keyboard.release(KEYMAP[row][column]);
 }
 
+
 void recordKeyPress(byte row, byte column) { 
   currentRecordingAddKeyPress(KEYMAP[row][column]);
 }
 
+
 void recordKeyRelease(byte row, byte column) { 
   currentRecordingAddKeyRelease(KEYMAP[row][column]);
 }
+
 
 void sendOrRecordKeyPress(byte row, byte column) { 
   if(!kbState.recording){ return sendKeyPress(row, column); }
@@ -404,21 +404,28 @@ void sendOrRecordKeyPress(byte row, byte column) {
   return recordKeyPress(row, column);  
 }
 
+
 void sendOrRecordKeyRelease(byte row, byte column) { 
   if(!kbState.recording){ 
     return sendKeyRelease(row, column); 
   }
-  //Serial.println("Key Released while recording");
   return recordKeyRelease(row, column);  
 }
 
+
 void nop(byte row, byte column) { }
+
 
 void record(byte row, byte column) { 
   // Will start or stop the recording
-  Serial.println("Rec k pressed");
-  kbState.recording = !kbState.recording;  
+  kbState.recording = !kbState.recording;
+  if(kbState.recording){
+    Serial.println("Recording started");
+  } else { 
+    Serial.println("Recording stopped");  
+  }
 }
+
 
 void executeActions(action* acts, int len) {
   action currentAction; 
@@ -454,6 +461,9 @@ void shiftActionsLeft(action* actions, int actionsLen, int positions) {
 }
 
 
+/**
+ * 
+ */
 void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) { 
   // first determine the lastMacro with a non 0 length.
   byte lastMacroToShift;
@@ -462,7 +472,8 @@ void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) {
       lastMacroToShift = i;  
     }
   }
-  // if we are shifting right we need to start from the the right, else we start from the left.
+  // if we are shifting right we need to start from the the right, 
+  // else we start from the left.
   if(positions>0) {
     // shift the macros to the right
     for(int i=lastMacroToShift ; i>firstMacroToShift ; i--) { 
@@ -487,6 +498,9 @@ int addLengthOfMacroActions(macro* macros, byte startIndex, byte endIndex) {
 }
 
 
+/**
+ * 
+ */
 void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) { 
   byte totalMacros = MACROSIZE;
   int location = kbState.actionsLen;
@@ -494,15 +508,14 @@ void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) {
   action* nextMacroActionsPtr = NULL;
 
   if ( macroIndex == (totalMacros - 1)) {
-    // we're saving the last macro, there's nothing to do.
+    // Last macro always has space. There's nothing to do.
     return;
   }
 
-  // add the size of all the macros to the right of macroIndex
+  // add the size of all the macros to the left and right of macroIndex
   int totalSizeToTheLeft = 0;
   int totalSizeToTheRight = 0;
   totalSizeToTheRight = addLengthOfMacroActions(kbState.macros, macroIndex+1, totalMacros);
-  // add the size of all the macros to the left of macroIndex
   totalSizeToTheLeft = addLengthOfMacroActions(kbState.macros, 0, macroIndex);
   int startMacroIndex = totalSizeToTheLeft + 1;
   int endMacroIndex = startMacroIndex + numberActionsRecorded;
@@ -515,7 +528,32 @@ void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) {
 }
 
 
-// Called when one of the Macro keys is pressed.
+/**
+ * Purpose of this function is to send the whole content
+ * of the macros memory. Useful for debugging.
+ */
+void dumpMacros(byte row, byte column) { 
+  char charVal[4];
+
+  for(int i=0 ; i<MACROSIZE ; i++){
+    macro m = kbState.macros[i];
+    Serial.println();
+    Serial.print("macro ");
+    Serial.print(i);
+    Serial.print("length ");
+    Serial.print(m.len);
+    Serial.println();
+    for(int j=0 ; j<m.len ; j++){
+      sprintf(charVal, "%02X", m.actions[j]);
+      Serial.print(charVal); Serial.print(" ");  
+    }
+  }
+}
+
+
+/**
+ * Called when one of the Macro keys is pressed.
+ */
 void macroKeyPress(byte row, byte column){
   if ( kbState.recording ) { // record a new macro
     // The keys that were captured are in currentRecording. 
@@ -539,10 +577,15 @@ void macroKeyPress(byte row, byte column){
     kbState.macros[column-1].actions = &(kbState.actions[startOfAction]);
     currentRecordingClear();
     kbState.recording = false;
-    // store all macros into eeprom
+    Serial.println("Recording stopped");
+    Serial.print("Saved macro ");
+    Serial.println(column);
+    // TODO store all macros into eeprom
     
   } else { // execute the macro
+    Serial.println("Executing macro");
     executeActions(kbState.macros[column-1].actions, kbState.macros[column-1].len);    
+    Serial.println("Finished executing macro");
   }
 }
 
@@ -611,7 +654,7 @@ void simulateTyping(byte row, byte column){
 
 // Action keymap. For every key, maps a function which determines what happens.
 const void (*ACTIONS[ROWCOUNT][COLUMNCOUNT]) (byte row, byte column) = {
-  {sendOrRecordKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, record, nop, nop, nop},
+  {sendOrRecordKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, dumpMacros, record, nop, nop, nop},
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress},
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress},
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress},
@@ -620,9 +663,11 @@ const void (*ACTIONS[ROWCOUNT][COLUMNCOUNT]) (byte row, byte column) = {
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress}
 };
 
+
 void onPressDispatchAction(byte row, byte column){
   return (ACTIONS[row][column])(row, column);
 }
+
 
 void onReleaseDispatchAction(byte row, byte column){
   if(row>0){
@@ -675,19 +720,18 @@ void loop() {
     for(byte row=0; row<ROWCOUNT; row++) {
       // Read switch on row row, column selectedColumn.
       switchOpen = (bool)digitalRead(ROWSPINS[row]);
-      if(!switchOpen && row==0 && selectedColumn==1){ 
-        Serial.println("stopping scan");
-        stopScanningOff = false;
-        break;
-        Serial.print(row);
-        Serial.print(",");
-        Serial.print(selectedColumn);
-        Serial.println(); 
-      }
+//      if(!switchOpen && row==0 && selectedColumn==1 && false /* disabled code */){ 
+//        Serial.println("stopping scan");
+//        stopScanningOff = false;
+//        break;
+//        Serial.print(row);
+//        Serial.print(",");
+//        Serial.print(selectedColumn);
+//        Serial.println(); 
+//      }
       last8Readings = matrixReadingsPush(row, selectedColumn, switchOpen);
       switchState = matrixStateGet(row, selectedColumn);
       if (last8Readings==0x0 && !switchState) { // stable press, non press to press.
-        Serial.println("K pressed");
         debugPrintRowCol(row, selectedColumn);
         onPressDispatchAction(row, selectedColumn);
         matrixStateSet(row, selectedColumn, true);
