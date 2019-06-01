@@ -695,54 +695,46 @@ void pressReleaseMultiple(byte row, byte column){
     
 }
 
-void loop() {
-  // this code should be rewritten with interrupts
+void scanMatrix () {
   bool rows[7];
   int selectedColumn = 0;
   byte columnBitmap = 0xFF;
   bool switchOpen = true;
   byte last8Readings = 0xFF;
   bool switchState = false;
+
+  columnBitmap = readRows(rows, 7, ROWSPINS);
+  // check each switch of this column
+  for(byte row=0; row<ROWCOUNT; row++) {
+    // Read switch on row row, column selectedColumn.
+    switchOpen = (bool)digitalRead(ROWSPINS[row]);
+    
+    last8Readings = matrixReadingsPush(row, selectedColumn, switchOpen);
+    switchState = matrixStateGet(row, selectedColumn);
+    if (last8Readings==0x0 && !switchState) { // stable press, non press to press.
+      debugPrintRowCol(row, selectedColumn);
+      onPressDispatchAction(row, selectedColumn);
+      matrixStateSet(row, selectedColumn, true);
+
+    }else if (last8Readings==0xFF && switchState) { // stable depress, press to non press.
+      onReleaseDispatchAction(row, selectedColumn);
+      matrixStateSet(row, selectedColumn, false);
+    }
+  }
+  selectedColumn = selectNextColumn(selectedColumn, COLUMNCOUNT);
+}
+
+
+void loop() {
+  // this code should be rewritten with interrupts
+  
   bool stopScanningOff = true; // used to break out of scanning routine
-
-  //init();
-  //setup();
-
-  //Serial.println("Loop Called");
 
   disableAllColumns();
   selectedColumn = selectFirstColumn();
   
-  while(stopScanningOff) {
-    
-    columnBitmap = readRows(rows, 7, ROWSPINS);
-    // check each switch of this column
-    for(byte row=0; row<ROWCOUNT; row++) {
-      // Read switch on row row, column selectedColumn.
-      switchOpen = (bool)digitalRead(ROWSPINS[row]);
-//      if(!switchOpen && row==0 && selectedColumn==1 && false /* disabled code */){ 
-//        Serial.println("stopping scan");
-//        stopScanningOff = false;
-//        break;
-//        Serial.print(row);
-//        Serial.print(",");
-//        Serial.print(selectedColumn);
-//        Serial.println(); 
-//      }
-      last8Readings = matrixReadingsPush(row, selectedColumn, switchOpen);
-      switchState = matrixStateGet(row, selectedColumn);
-      if (last8Readings==0x0 && !switchState) { // stable press, non press to press.
-        debugPrintRowCol(row, selectedColumn);
-        onPressDispatchAction(row, selectedColumn);
-        matrixStateSet(row, selectedColumn, true);
-
-      }else if (last8Readings==0xFF && switchState) { // stable depress, press to non press.
-        onReleaseDispatchAction(row, selectedColumn);
-        matrixStateSet(row, selectedColumn, false);
-      }
-    }
-    selectedColumn = selectNextColumn(selectedColumn, COLUMNCOUNT);
-  
+  while(1) {
+    scanMatrix();
   }
 
   // We stopped scanning
