@@ -5,10 +5,15 @@
 # If you install it in another place, adjust the include below to match
 #
 # More info: https://mjoldfield.com/atelier/2009/02/arduino-cli.html
+#
+# Install arduino-makefile: sudo apt-get install arduino-mk
 
 
-BOARD_TAG    = pro5v328
-ARDUINO_LIBS = Keyboard HID
+MCU = atmega32u4
+BOARD_TAG    = leonardo
+ARDUINO_LIBS = Keyboard HID EEPROM
+ARDUINO_DIR  = /home/tiago/bin/arduino-1.8.7
+ARDMK_DIR	   = /usr/share/arduino/
 #MONITOR_PORT = /dev/ttyACM0
 include /usr/share/arduino/Arduino.mk
 
@@ -26,20 +31,20 @@ include /usr/share/arduino/Arduino.mk
 
 
 # --- atmega328p on breadboard
-#BOARD_TAG    = atmega328bb
+is:open#BOARD_TAG    = atmega328bb
 #ISP_PROG     = usbasp
 #AVRDUDE_OPTS = -v
 #BOARDS_TXT   = $(HOME)/arduino/hardware/breadboard/boards.txt
 #include /usr/share/arduino/Arduino.mk
 
-CC=g++
 CFLAGS=-I.
+OTHER_OBJS=MacroPersistance.o
 
-clean:
-	rm -rf ./*.o
+#clean:
+#	rm -rf ./*.o
 
-test.o: test.cpp
-	$(CC) -c -o $@ $< $(CFLAGS)
+#test.o: test.cpp
+#	$(CC) -c -o $@ $< $(CFLAGS)
 
-test: test.o
-	$(CC) -o test test.o
+#test: src/test/test.o
+#	gcc -o src/test/test src/test/test.o
