@@ -338,7 +338,7 @@ byte selectNextColumn(byte currentColumn, byte numColumns) {
  * Returns a bitmap for fast decision on the status of the rows.
  * Will return 0xFF if nothing is pressed.
  **/
-byte readRows(bool rows[], byte numRows, byte rowsPins[]) {
+byte readRows(bool rows[], byte numRows, const byte rowsPins[]) {
   byte result = 0xFF;
   byte pinValue = 1; // pins will be 1 unless the key is pressed
   for(byte i=0 ; i<numRows ; i++) {
@@ -653,7 +653,7 @@ void simulateTyping(byte row, byte column){
 
 
 // Action keymap. For every key, maps a function which determines what happens.
-const void (*ACTIONS[ROWCOUNT][COLUMNCOUNT]) (byte row, byte column) = {
+void (*ACTIONS[ROWCOUNT][COLUMNCOUNT]) (byte row, byte column) = {
   {sendOrRecordKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, macroKeyPress, dumpMacros, record, nop, nop, nop},
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress},
   {sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress, sendOrRecordKeyPress},

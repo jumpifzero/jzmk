@@ -1,6 +1,6 @@
 .PHONY: jzmk copy-ino
 
-INC=./
+INC=./mock/
 
 copy-ino:
 	cp ../../jzmk.ino ./jzmk.cpp
@@ -14,5 +14,8 @@ copy-cpp:
 jzmk: ../../jzmk.ino
 	g++ -I$(INC) -c jzmk.cpp -o jzmk.o
 
-test: test.o copy-ino copy-headers copy-cpp jzmk
-	g++ -I$(INC) -o test test.o
+mock-arduino.o:
+	g++ -c mock-arduino.cpp
+
+test: test.o mock-arduino.o copy-ino copy-headers copy-cpp jzmk
+	g++ -I$(INC) -o test test.o mock-arduino.o
