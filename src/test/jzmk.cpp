@@ -126,7 +126,7 @@ byte matrixReadings[ROWCOUNT][COLUMNCOUNT];
 
 
 // Global keyboard state
-struct kbState_s { 
+typedef struct kbState_s {
   byte recording;
   action currentRecording[200];
   int currentRecordingLen;
@@ -135,7 +135,9 @@ struct kbState_s {
   action actions[ACTIONSMEMSIZE];  // The actions comprising each macro, pointed by macro
   // the actions array is _always_ kept compacted from index 0 up to actionsLen.
   int actionsLen;
-} kbState;
+} KBState;
+
+KBState kbState;
 
 
 /**
@@ -508,8 +510,8 @@ void macrosMakeSpaceForRecording(byte macroIndex, byte numberActionsRecorded) {
   action* nextMacroActionsPtr = NULL;
 
   if ( macroIndex == (totalMacros - 1)) {
-    // Last macro always has space. There's nothing to do.
-    return;
+    // Last macro always has space. There's nothing to shift.
+    return addLengthOfMacroActions(kbState.macros, 0, totalMacros) + numberActionsRecorded;
   }
 
   // add the size of all the macros to the left and right of macroIndex
@@ -555,6 +557,8 @@ void dumpMacros(byte row, byte column) {
  * Called when one of the Macro keys is pressed.
  */
 void macroKeyPress(byte row, byte column){
+  int newActionsLen = 0;
+
   if ( kbState.recording ) { // record a new macro
     // The keys that were captured are in currentRecording. 
     // The size of the recording is in currentRecordingLen.
@@ -565,16 +569,25 @@ void macroKeyPress(byte row, byte column){
     // the actions of N. This means we may need to shift left
     // all macros above N or shift them right.
     // This is dealt on function macrosMakeSpaceForRecording
-    macrosMakeSpaceForRecording(column-1, kbState.currentRecordingLen);
-    // Add the length of all the macro actions to the left of this one.
-
-    int startOfAction = kbState.actionsLen;
-    for(int i=0 ; i<kbState.currentRecordingLen; i++){
-      kbState.actions[kbState.actionsLen].action = kbState.currentRecording[i].action;
-      kbState.actions[kbState.actionsLen].key = kbState.currentRecording[i].key;  
-      kbState.actionsLen = kbState.actionsLen + 1;
+    newActionsLen = macrosMakeSpaceForRecording(column-1, kbState.currentRecordingLen);
+    // The actions array will be written from
+    // "end of previous macro actions + 1"
+    int startOfWriteArea = 0;
+    // Repoint actions of this macro the right place.
+    if (column >= 1) {
+      startOfWriteArea = kbState.macros[column-1].len + 1;
+      kbState.macros[column-1].actions = &(kbState.actions[startOfWriteArea]);
+    } else {
+      kbState.macros[0].actions = &(kbState.actions[0]);
     }
-    kbState.macros[column-1].actions = &(kbState.actions[startOfAction]);
+    // Copy from the current recording to the actions array.
+    for(int i=0 ; i<kbState.currentRecordingLen; i++){
+      kbState.actions[startOfWriteArea+i].action = kbState.currentRecording[i].action;
+      kbState.actions[startOfWriteArea+i].key = kbState.currentRecording[i].key;  
+      kbState.actionsLen = newActionsLen;
+    }
+
+    
     currentRecordingClear();
     kbState.recording = false;
     Serial.println("Recording stopped");
