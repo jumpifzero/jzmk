@@ -1,6 +1,18 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdio.h>
+#include <list>
+
+using namespace std;
+
+class KeyboardEvent {
+ public:
+  static const int PRESS = 0;
+  static const int RELEASE = 1;
+
+  int type;
+  int key;
+};
 
 class Keyboard_ {
  public:
@@ -12,6 +24,8 @@ class Keyboard_ {
   size_t press(uint8_t k);
   size_t release(uint8_t k);
   void releaseAll(void);
+  // Extension diagnostics
+  list<KeyboardEvent> history;
 };
 extern Keyboard_ Keyboard;
 

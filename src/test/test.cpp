@@ -4,11 +4,25 @@
 #include <stdio.h>
 #include <assert.h>
 #include "../../macrotypes.h"
+#include "mock-arduino.h"
 
 using namespace std;
 
 #define MACROSIZE 11
 #define ACTIONSMEMSIZE 500
+
+// Definitions of key coordinates so it is easier to write tests below
+#define KEY_M2 0,2
+#define KEY_H 4,6
+#define KEY_U 3,7
+#define KEY_E 3,3
+#define KEY_L 4,9
+#define KEY_O 3,9
+#define KEY_G 4,5
+#define KEY_P 3,10
+#define KEY_I 3,8
+#define KEY_K 4,8
+#define KEY_W 3,2
 
 typedef uint8_t byte;
 
@@ -25,6 +39,8 @@ typedef struct kbState_s {
   int actionsLen;
 } KBState;
 
+extern Keyboard_ Keyboard;
+
 extern KBState kbState;
 
 extern void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions);
@@ -40,7 +56,7 @@ void sendOrRecordKeyRelease(byte row, byte column);
 void macroKeyPress(byte row, byte column);
 
 // ------------------------------------------------------------
-// Functions to be mocked
+// Mocked functions
 void writeToEEPROM(unsigned char*, int){}
 
 void readFromEEPROM(unsigned char*, int){}
@@ -49,16 +65,29 @@ void digitalRead(unsigned char){}
 
 void digitalWrite(unsigned char, unsigned char){}
 
+
+// ------------------------------------------------------------
+// Helper functions
+
 // Simulates press and release of a key
 void tap(byte row, byte column) {
   sendOrRecordKeyPress(row, column); // L
   sendOrRecordKeyRelease(row, column);
 }
 
+void storeInMacro(int m){
+  macroKeyPress(0,m); // Save recording in macro Mm
+}
+
+void tapRecordKey(){
+  record(0,0);
+}
+
+
 // ------------------------------------------------------------
 // TESTS
 
-// Tests that we can enter and exit recording mode
+// Test that we can enter and exit recording mode
 void testRecord(){
   // confirm it is not in recording mode
   assert(!kbState.recording);
@@ -70,20 +99,20 @@ void testRecord(){
   assert(!kbState.recording);
 }
 
-
-// Tests that we can record keys as they are pressed and assign to a macro
-void testRecordingSingle(){
+// Test that we can record keys as they are pressed and assign to a macro
+void testRecordingM1(){
   // confirm it is not in recording mode
   assert(!kbState.recording);
   record(0,0); // now it is recording. Confirm it
   assert(kbState.recording);
   // press and release a few keys
-  tap(4,6); // H
-  tap(3,3); // E
-  tap(4,9); // L
-  tap(4,9); // L
-  tap(3,9); // O
-  macroKeyPress(0,1); // Save recording in macro M1
+  tap(KEY_H);
+  tap(KEY_E);
+  tap(KEY_L);
+  tap(KEY_L);
+  tap(KEY_O);
+  storeInMacro(1);
+
   // Confirm it is no longer recording
   assert(!kbState.recording);
   // make sure we captured something in the kbState
@@ -92,30 +121,62 @@ void testRecordingSingle(){
   assert(kbState.actionsLen == 10);
   assert(kbState.actions[0].key == 'h');
   assert(kbState.actions[2].key == 'e');
-  // Now record something longer on top of M1
 
+  // Now record something longer on top of M1
   record(0,0); // now it is recording. Confirm it
   assert(kbState.recording);
   // press and release a few keys
-  tap(4,5); // G
-  tap(3,2); // W
-  tap(4,8); // K
-  tap(4,8); // K
-  tap(3,8); // I
-  tap(3,10); // P
-  macroKeyPress(0,1); // Save recording in macro M1
+  tap(KEY_G);
+  tap(KEY_W);
+  tap(KEY_K);
+  tap(KEY_K);
+  tap(KEY_I);
+  tap(KEY_P);
+  storeInMacro(1);
+
   assert(kbState.actionsLen == 12);
   assert(kbState.actions[0].key == 'g');
   assert(kbState.actions[2].key == 'w');
   assert(kbState.actions[10].key == 'p');
+
+  // Record something shorter on top of M1
+  tapRecordKey();
+  assert(kbState.recording);
+  // press and release a key
+  tap(KEY_U);
+  storeInMacro(1);
+
+  assert(kbState.actionsLen == 2);
+  assert(kbState.actions[0].key == 'u');
+
+}
+
+void testRecordingM2AndReplay(){
+  // make sure the kbd is in the state we expect prior to the test
+  assert(kbState.actionsLen == 2);
+
+  tapRecordKey();
+  tap(KEY_H);
+  tap(KEY_E);
+  tap(KEY_L);
+  tap(KEY_L);
+  tap(KEY_O);
+  storeInMacro(2);
+
+  assert(kbState.actionsLen == (10+2));
+  macroKeyPress(KEY_M2);
+  // In theory HELLO was replayed. We can verify looking at Keyboard.history
+  assert(Keyboard.history.size() == 10);
 }
 
 int main() {
   // initialize the kbState global structure
   kbStateInit();
-  //testRecord();
-  testRecordingSingle();
-  //  shiftMacroActions(m, 0, 2);
+
+  testRecord();
+  testRecordingM1();
+  testRecordingM2AndReplay();
+
   printf("Tests passed.\n");
   exit(0);
 }
