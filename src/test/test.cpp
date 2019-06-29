@@ -13,6 +13,7 @@ using namespace std;
 
 // Definitions of key coordinates so it is easier to write tests below
 #define KEY_M2 0,2
+#define KEY_M3 0,3
 #define KEY_H 4,6
 #define KEY_U 3,7
 #define KEY_E 3,3
@@ -23,6 +24,9 @@ using namespace std;
 #define KEY_I 3,8
 #define KEY_K 4,8
 #define KEY_W 3,2
+#define KEY_Q 3,1
+#define KEY_E 3,3
+
 
 typedef uint8_t byte;
 
@@ -167,6 +171,43 @@ void testRecordingM2AndReplay(){
   macroKeyPress(KEY_M2);
   // In theory HELLO was replayed. We can verify looking at Keyboard.history
   assert(Keyboard.history.size() == 10);
+
+  list<KeyboardEvent>::iterator it;
+  int i = 0;
+  char msg[] = "hheelllloo"; // keys twice due due to press + release
+  for (it = Keyboard.history.begin(); it != Keyboard.history.end(); ++it){
+    assert(it->key == msg[i++]);
+  }
+
+  // Record something on M3
+  tapRecordKey();
+  tap(KEY_Q);
+  tap(KEY_W);
+  tap(KEY_E);
+  tap(KEY_Q);
+  tap(KEY_W);
+  storeInMacro(3);
+
+  // Record something longer in M2, check M3 is OK
+  tapRecordKey();
+  tap(KEY_H);
+  tap(KEY_E);
+  tap(KEY_L);
+  tap(KEY_L);
+  tap(KEY_O);
+  tap(KEY_O);
+  tap(KEY_O);
+  tap(KEY_O);
+  storeInMacro(2);
+
+  Keyboard.history.clear();
+  macroKeyPress(KEY_M3);
+  
+  char m3[] = "qqwweeqqww";
+  i = 0;
+  for (it = Keyboard.history.begin(); it != Keyboard.history.end(); ++it){
+    assert(it->key == m3[i++]);
+  }
 }
 
 int main() {
