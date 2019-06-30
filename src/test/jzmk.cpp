@@ -586,14 +586,20 @@ void macroKeyPress(byte row, byte column){
     int startOfWriteArea = 0;
     // Repoint actions of this macro the right place.
     if (macroIndex >= 1) {
-      startOfWriteArea = kbState.macros[macroIndex].len;
-      kbState.macros[macroIndex].actions = &(kbState.actions[startOfWriteArea]);
+      kbState.macros[macroIndex].actions = kbState.macros[macroIndex-1].actions + 
+        kbState.macros[macroIndex-1].len;
+      // startOfWriteArea = kbState.macros[macroIndex].len;
+      // kbState.macros[macroIndex].actions = &(kbState.actions[startOfWriteArea]);
     } else {
       kbState.macros[0].actions = &(kbState.actions[0]);
     }
     // Copy from the current recording to the actions array.
+    action *act = kbState.macros[macroIndex].actions;
     for(int i=0 ; i<kbState.currentRecordingLen; i++){
-      kbState.actions[startOfWriteArea+i].action = kbState.currentRecording[i].action;
+      act->action = kbState.currentRecording[i].action;
+      act->key = kbState.currentRecording[i].key;
+      act++;
+      //kbState.actions[startOfWriteArea+i].action = kbState.currentRecording[i].action;
       kbState.actions[startOfWriteArea+i].key = kbState.currentRecording[i].key;
     }
     // Calculate new length of macro actions
