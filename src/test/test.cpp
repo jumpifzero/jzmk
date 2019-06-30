@@ -179,6 +179,12 @@ void testRecordingM2AndReplay(){
     assert(it->key == msg[i++]);
   }
 
+
+}
+
+void testRecordingM3(){
+  Keyboard.history.clear();
+
   // Record something on M3
   tapRecordKey();
   tap(KEY_Q);
@@ -187,6 +193,8 @@ void testRecordingM2AndReplay(){
   tap(KEY_Q);
   tap(KEY_W);
   storeInMacro(3);
+  assert(kbState.macros[2].len == 10);
+  assert(kbState.currentRecordingLen == 0);
 
   // Record something longer in M2, check M3 is OK
   tapRecordKey();
@@ -198,13 +206,17 @@ void testRecordingM2AndReplay(){
   tap(KEY_O);
   tap(KEY_O);
   tap(KEY_O);
-  storeInMacro(2);
+  printf("%d\n", kbState.currentRecordingLen);
+  assert(kbState.currentRecordingLen == 16);
+  storeInMacro(2);  
+  assert(kbState.macros[2].len == 16);
 
-  Keyboard.history.clear();
+  // Replay the macro 3
   macroKeyPress(KEY_M3);
   
   char m3[] = "qqwweeqqww";
-  i = 0;
+  int i = 0;
+  list<KeyboardEvent>::iterator it;
   for (it = Keyboard.history.begin(); it != Keyboard.history.end(); ++it){
     assert(it->key == m3[i++]);
   }
@@ -217,6 +229,7 @@ int main() {
   testRecord();
   testRecordingM1();
   testRecordingM2AndReplay();
+  testRecordingM3();
 
   printf("Tests passed.\n");
   exit(0);

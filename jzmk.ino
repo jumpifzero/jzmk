@@ -586,8 +586,10 @@ void macroKeyPress(byte row, byte column){
     int startOfWriteArea = 0;
     // Repoint actions of this macro the right place.
     if (macroIndex >= 1) {
-      startOfWriteArea = kbState.macros[macroIndex].len;
-      kbState.macros[macroIndex].actions = &(kbState.actions[startOfWriteArea]);
+      kbState.macros[macroIndex].actions = kbState.macros[macroIndex-1].actions + 
+        kbState.macros[macroIndex-1].len
+      // startOfWriteArea = kbState.macros[macroIndex].len;
+      // kbState.macros[macroIndex].actions = &(kbState.actions[startOfWriteArea]);
     } else {
       kbState.macros[0].actions = &(kbState.actions[0]);
     }
@@ -598,8 +600,15 @@ void macroKeyPress(byte row, byte column){
     }
     // Calculate new length of macro actions
     int leftLen = sumLengthOfMacroActions(kbState.macros, macroIndex-1, macroIndex);
+    Serial.print("Left len: ");
+    Serial.println(leftLen);
     int rightLen = sumLengthOfMacroActions(kbState.macros, macroIndex+1, MACROSIZE);
+    Serial.print("Right len: ");
+    Serial.println(rightLen);
     kbState.actionsLen = leftLen + rightLen + kbState.currentRecordingLen;
+    Serial.print("Actions Len: ");
+    Serial.println(kbState.actionsLen);
+
     // clear current recording
     currentRecordingClear();
     kbState.recording = false;

@@ -598,8 +598,15 @@ void macroKeyPress(byte row, byte column){
     }
     // Calculate new length of macro actions
     int leftLen = sumLengthOfMacroActions(kbState.macros, macroIndex-1, macroIndex);
+    Serial.print("Left len: ");
+    Serial.println(leftLen);
     int rightLen = sumLengthOfMacroActions(kbState.macros, macroIndex+1, MACROSIZE);
+    Serial.print("Right len: ");
+    Serial.println(rightLen);
     kbState.actionsLen = leftLen + rightLen + kbState.currentRecordingLen;
+    Serial.print("Actions Len: ");
+    Serial.println(kbState.actionsLen);
+
     // clear current recording
     currentRecordingClear();
     kbState.recording = false;
