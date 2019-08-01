@@ -478,12 +478,12 @@ void shiftMacroActions(macro* macros, byte firstMacroToShift, int positions) {
   // else we start from the left.
   if(positions>0) {
     // shift the macros to the right
-    for(int i=lastMacroToShift ; i>firstMacroToShift ; i--) { 
+    for(int i=lastMacroToShift ; i>=firstMacroToShift ; i--) { 
         shiftActionsRight(macros[i].actions, macros[i].len, positions);
         macros[i].actions = macros[i].actions + positions;
     }  
   } else { 
-     for(int i=firstMacroToShift ; i<lastMacroToShift ; i++) { 
+     for(int i=firstMacroToShift ; i<=lastMacroToShift ; i++) { 
         shiftActionsLeft(macros[i].actions, macros[i].len, positions);
         macros[i].actions = macros[i].actions + positions;
     }

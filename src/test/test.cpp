@@ -155,7 +155,15 @@ void testRecordingM1(){
 
 }
 
-void testRecordingM2AndReplay(){
+void assertEq (int act, int exp) {
+  if ( act != exp) {
+    printf("Expecting: %d\n", exp);
+    printf("Actual: %d\n", act);
+  }
+  assert(act == exp);
+}
+
+void testRecordingM2AndReplay () {
   // make sure the kbd is in the state we expect prior to the test
   assert(kbState.actionsLen == 2);
 
@@ -176,10 +184,8 @@ void testRecordingM2AndReplay(){
   int i = 0;
   char msg[] = "hheelllloo"; // keys twice due due to press + release
   for (it = Keyboard.history.begin(); it != Keyboard.history.end(); ++it){
-    assert(it->key == msg[i++]);
+    assertEq(msg[i++], it->key);
   }
-
-
 }
 
 void testRecordingM3(){
